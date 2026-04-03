@@ -27,7 +27,14 @@
       "Bash(cp -f Build/Build.framework.js WebBuild.framework.js)",
       "Bash(cp -f Build/Build.loader.js WebBuild.loader.js)",
       "Bash(cp -f Build/Build.wasm WebBuild.wasm)",
-      "WebFetch(domain:baduk-marble-production.up.railway.app)"
+      "WebFetch(domain:baduk-marble-production.up.railway.app)",
+      "Bash(claude mcp:*)",
+      "Bash(node -e \"const pkg = JSON.parse\\(require\\('fs'\\).readFileSync\\('node_modules/@modelcontextprotocol/sdk/package.json','utf8'\\)\\); console.log\\(pkg.version\\)\")",
+      "Bash(node -e ':*)",
+      "Bash(CLAUDE_DEBUG=1 claude mcp get local-vision-mcp)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('projects',{}\\), indent=2\\)\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(JSON.stringify\\(j.projects||j.mcpServers||{},null,2\\)\\)}\\)\")",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(d\\);console.log\\(Object.keys\\(j.projects||{}\\)\\)}\\)\")"
     ]
   },
   "enableAllProjectMcpServers": true,
