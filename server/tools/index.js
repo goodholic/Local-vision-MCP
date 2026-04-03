@@ -518,7 +518,75 @@ export function registerTools(server, sendCommand) {
   );
 
   // ════════════════════════════════════════════════════════════════
-  // 10. SYSTEM INFO
+  // 10. BATCH EXECUTE (multiple actions in one round-trip)
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "batch_execute",
+    `여러 동작을 한 번의 통신으로 일괄 실행합니다. 속도가 중요할 때 사용하세요.
+예시: 새 메모장 열고 텍스트 입력 → actions: [
+  { command: "clipboard_write", params: { text: "hello" } },
+  { command: "mouse_click", params: { x: 500, y: 300 } },
+  { command: "keyboard_shortcut", params: { name: "paste" } },
+  { command: "capture_screen", params: { quality: 50 } }
+]
+사용 가능한 command: capture_screen, capture_region, mouse_click, mouse_move, mouse_drag, mouse_scroll, keyboard_type, keyboard_press, keyboard_shortcut, clipboard_write, clipboard_read, local_run_command, local_read_file, local_write_file, wait, list_windows 등 모든 기존 도구`,
+    {
+      actions: z.array(z.object({
+        command: z.string().describe("실행할 명령어 이름"),
+        params: z.record(z.any()).optional().describe("명령어 파라미터"),
+        waitBefore: z.number().optional().describe("이 동작 실행 전 대기 ms"),
+      })).describe("순서대로 실행할 동작 목록"),
+      stopOnError: z.boolean().optional().describe("에러 발생 시 중단 여부 (기본값: false)"),
+    },
+    async (params) => {
+      // Calculate timeout: 10s base + 5s per action + extra for captures/commands
+      const actionCount = params.actions.length;
+      const totalWait = params.actions.reduce((s, a) => s + (a.waitBefore || 0), 0);
+      const timeoutMs = Math.max(60000, 10000 + actionCount * 5000 + totalWait);
+
+      const result = await sendCommand("batch_execute", params, timeoutMs);
+      const content = [];
+
+      // Build response: collect all images and text results
+      let summary = [];
+      for (const r of result.results) {
+        if (!r.success) {
+          summary.push(`[${r.index}] ${r.command}: ERROR - ${r.error}`);
+          continue;
+        }
+        summary.push(`[${r.index}] ${r.command}: OK`);
+        // If result contains an image, include it
+        if (r.result && r.result.image) {
+          content.push({
+            type: "image",
+            data: r.result.image,
+            mimeType: "image/jpeg",
+          });
+        }
+      }
+
+      content.push({
+        type: "text",
+        text: `Batch 완료 (${result.results.length}개 동작)\n${summary.join("\n")}`,
+      });
+
+      // Append any non-image data from results
+      for (const r of result.results) {
+        if (r.success && r.result) {
+          if (r.result.text) content.push({ type: "text", text: r.result.text });
+          if (r.result.content) content.push({ type: "text", text: r.result.content });
+          if (r.result.windows) content.push({ type: "text", text: JSON.stringify(r.result.windows, null, 2) });
+          if (r.result.stdout !== undefined) content.push({ type: "text", text: `stdout: ${r.result.stdout}` });
+        }
+      }
+
+      return { content };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // 11. SYSTEM INFO
   // ════════════════════════════════════════════════════════════════
 
   server.tool(
