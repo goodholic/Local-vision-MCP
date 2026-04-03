@@ -78,6 +78,17 @@ export function sendCommand(command, params = {}, timeoutMs = 60000) {
   });
 }
 
+// ─── OAuth discovery endpoints (return JSON 404 so MCP clients skip auth) ───
+app.get("/.well-known/oauth-authorization-server", (req, res) => {
+  res.status(404).json({ error: "not_found" });
+});
+app.get("/.well-known/oauth-protected-resource/:path(*)?", (req, res) => {
+  res.status(404).json({ error: "not_found" });
+});
+app.post("/register", (req, res) => {
+  res.status(404).json({ error: "not_found" });
+});
+
 // ─── Health / status endpoint ────────────────────────────────────
 app.get("/health", (req, res) => {
   res.json({
