@@ -11,6 +11,7 @@ const LOCAL_CLIENT_SECRET = process.env.LOCAL_CLIENT_SECRET || "changeme";
 
 // ─── Express + HTTP + Socket.io ───────────────────────────────────
 const app = express();
+app.use(express.json());
 const httpServer = createServer(app);
 
 const io = new SocketIOServer(httpServer, {
