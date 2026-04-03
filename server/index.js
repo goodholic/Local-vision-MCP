@@ -119,12 +119,16 @@ function createMcpTransport() {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => uuidv4(),
     enableJsonResponse: true,
+    onsessioninitialized: (sessionId) => {
+      transports[sessionId] = transport;
+      console.log(`[MCP] Session started: ${sessionId}`);
+    },
   });
   mcpServer.connect(transport);
-  transports[transport.sessionId] = transport;
-  console.log(`[MCP] Session started: ${transport.sessionId}`);
   transport.onclose = () => {
-    delete transports[transport.sessionId];
+    if (transport.sessionId) {
+      delete transports[transport.sessionId];
+    }
     console.log(`[MCP] Session closed: ${transport.sessionId}`);
   };
   return transport;
