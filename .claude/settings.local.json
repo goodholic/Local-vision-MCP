@@ -3,7 +3,35 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(timeout 5 node index.js)",
-      "Bash(node -e \"import\\('./handlers/router.js'\\).then\\(\\(\\) => console.log\\('OK'\\)\\).catch\\(e => console.error\\(e.message\\)\\)\")"
+      "Bash(node -e \"import\\('./handlers/router.js'\\).then\\(\\(\\) => console.log\\('OK'\\)\\).catch\\(e => console.error\\(e.message\\)\\)\")",
+      "Bash(railway status:*)",
+      "Bash(curl:*)",
+      "Bash(node index.js)",
+      "mcp__local-vision__ping_local",
+      "mcp__local-vision__capture_screen",
+      "mcp__local-vision__list_windows",
+      "mcp__local-vision__local_run_command",
+      "WebFetch(domain:local-vision-mcp-production.up.railway.app)",
+      "mcp__local-vision__local_list_directory",
+      "mcp__local-vision__local_read_file",
+      "mcp__local-vision__capture_region",
+      "mcp__local-vision__get_screen_info",
+      "mcp__local-vision__mouse_click",
+      "mcp__local-vision__keyboard_press",
+      "mcp__local-vision__keyboard_type",
+      "mcp__local-vision__clipboard_write",
+      "mcp__local-vision__keyboard_shortcut",
+      "mcp__local-vision__local_write_file",
+      "Read(//c/Users/super/My project/Baduk Marble/public/Build/**)",
+      "Bash(cp -f Build/Build.data WebBuild.data)",
+      "Bash(cp -f Build/Build.framework.js WebBuild.framework.js)",
+      "Bash(cp -f Build/Build.loader.js WebBuild.loader.js)",
+      "Bash(cp -f Build/Build.wasm WebBuild.wasm)",
+      "WebFetch(domain:baduk-marble-production.up.railway.app)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "local-vision"
+  ]
 }

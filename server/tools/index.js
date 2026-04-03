@@ -12,7 +12,9 @@ export function registerTools(server, sendCommand) {
 
   server.tool(
     "capture_screen",
-    "로컬 PC 화면을 캡처합니다. 듀얼 모니터 지원: monitor=0(주), monitor=1(보조), monitor='all'(전체). 기본값은 주 모니터.",
+    `로컬 PC 화면을 캡처합니다. 듀얼 모니터 지원: monitor=0(주), monitor=1(보조), monitor='all'(전체).
+[중요] 캡처 이미지는 리사이즈될 수 있습니다. 마우스 좌표를 사용할 때는 반드시 응답의 scaleX/scaleY를 곱하여 실제 화면 좌표로 변환하세요.
+예: 이미지에서 (500, 300) 위치 → 실제 좌표 = (500*scaleX + offsetX, 300*scaleY + offsetY)`,
     {
       monitor: z.union([z.number(), z.string()]).optional().describe("모니터 선택: 0=주모니터, 1=보조모니터, 'all'=전체 (기본값: 주모니터)"),
       quality: z.number().min(1).max(100).optional().describe("JPEG 품질 (1-100, 기본값: 60)"),
@@ -24,7 +26,10 @@ export function registerTools(server, sendCommand) {
       return {
         content: [
           { type: "image", data: result.image, mimeType: "image/jpeg" },
-          { type: "text", text: `${monitorLabel} 캡처 완료 (${result.width}x${result.height})` },
+          {
+            type: "text",
+            text: `${monitorLabel} 캡처 완료 (이미지: ${result.width}x${result.height}, 실제화면: ${result.screenWidth}x${result.screenHeight})\n좌표 변환: scaleX=${result.scaleX}, scaleY=${result.scaleY}, offsetX=${result.monitorOffset.x}, offsetY=${result.monitorOffset.y}\n마우스 좌표 = (이미지X * ${result.scaleX} + ${result.monitorOffset.x}, 이미지Y * ${result.scaleY} + ${result.monitorOffset.y})`,
+          },
         ],
       };
     }
@@ -46,7 +51,10 @@ export function registerTools(server, sendCommand) {
       return {
         content: [
           { type: "image", data: result.image, mimeType: "image/jpeg" },
-          { type: "text", text: `영역 캡처 완료 (${params.x},${params.y} → ${params.width}x${params.height})` },
+          {
+            type: "text",
+            text: `영역 캡처 완료 (${params.x},${params.y} → ${params.width}x${params.height})\n좌표 변환: scaleX=${result.scaleX}, scaleY=${result.scaleY}, offsetX=${result.monitorOffset.x}, offsetY=${result.monitorOffset.y}`,
+          },
         ],
       };
     }
@@ -530,7 +538,10 @@ export function registerTools(server, sendCommand) {
   { command: "keyboard_shortcut", params: { name: "paste" } },
   { command: "capture_screen", params: { quality: 50 } }
 ]
-사용 가능한 command: capture_screen, capture_region, mouse_click, mouse_move, mouse_drag, mouse_scroll, keyboard_type, keyboard_press, keyboard_shortcut, clipboard_write, clipboard_read, local_run_command, local_read_file, local_write_file, wait, list_windows 등 모든 기존 도구`,
+사용 가능한 command: capture_screen, capture_region, mouse_click, mouse_move, mouse_drag, mouse_scroll, keyboard_type, keyboard_press, keyboard_shortcut, clipboard_write, clipboard_read, local_run_command, local_read_file, local_write_file, wait, list_windows 등 모든 기존 도구
+
+[팁] Claude Code(Cursor)가 "진행할까요?" 등 확인을 물으면 auto_accept_prompt 도구를 사용하거나,
+batch_execute로 keyboard_type("y") + keyboard_press(["enter"])를 보내세요.`,
     {
       actions: z.array(z.object({
         command: z.string().describe("실행할 명령어 이름"),
@@ -586,7 +597,98 @@ export function registerTools(server, sendCommand) {
   );
 
   // ════════════════════════════════════════════════════════════════
-  // 11. SYSTEM INFO
+  // 11. CLAUDE CODE AUTOMATION
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "auto_accept_prompt",
+    `Claude Code(Cursor 등)에서 "진행할까요?", "Proceed?", "Do you want to..." 등의 확인 질문이 나올 때 자동으로 수락합니다.
+'y'를 입력하고 Enter를 눌러 자동 승인합니다. Claude Code가 권한을 물어볼 때 사용하세요.
+[중요] 이 도구는 Claude Code 터미널이 활성화(포커스)된 상태에서만 동작합니다.`,
+    {
+      response: z.string().optional().describe("입력할 응답 (기본값: 'y')"),
+      pressEnter: z.boolean().optional().describe("Enter 키도 누를지 (기본값: true)"),
+    },
+    async (params) => {
+      const response = params.response || "y";
+      const pressEnter = params.pressEnter !== false;
+
+      const actions = [
+        { command: "keyboard_type", params: { text: response } },
+      ];
+      if (pressEnter) {
+        actions.push({ command: "keyboard_press", params: { keys: ["enter"] } });
+      }
+
+      const result = await sendCommand("batch_execute", { actions, stopOnError: false });
+      return {
+        content: [{
+          type: "text",
+          text: `자동 수락 완료: "${response}" 입력${pressEnter ? " + Enter" : ""}`,
+        }],
+      };
+    }
+  );
+
+  server.tool(
+    "reconnect_claude_mcp",
+    `Claude Code의 MCP 연결이 끊어졌을 때 재연결을 수행합니다.
+순서: 1) 현재 터미널에서 Ctrl+C로 종료 2) 'claude' 입력하여 Claude Code 재시작 3) '/mcp' 입력하여 MCP 재연결
+[주의] Claude Code가 실행 중인 터미널이 활성화(포커스)된 상태에서 사용하세요.`,
+    {
+      terminalAction: z.enum(["restart_claude", "send_mcp_command", "full_reconnect"]).describe(
+        "restart_claude: Ctrl+C 후 claude 재실행, send_mcp_command: /mcp만 입력, full_reconnect: 전체 재연결 수행"
+      ),
+      waitMs: z.number().optional().describe("각 단계 사이 대기 시간 ms (기본값: 2000)"),
+    },
+    async (params) => {
+      const wait = params.waitMs || 2000;
+      let actions = [];
+
+      if (params.terminalAction === "send_mcp_command") {
+        actions = [
+          { command: "keyboard_type", params: { text: "/mcp" } },
+          { command: "keyboard_press", params: { keys: ["enter"] } },
+        ];
+      } else if (params.terminalAction === "restart_claude") {
+        actions = [
+          // Ctrl+C to stop current process
+          { command: "keyboard_press", params: { keys: ["control", "c"] } },
+          { command: "wait", params: { ms: wait }, waitBefore: 500 },
+          // Type 'claude' to restart
+          { command: "keyboard_type", params: { text: "claude" } },
+          { command: "keyboard_press", params: { keys: ["enter"] } },
+        ];
+      } else {
+        // full_reconnect
+        actions = [
+          // Ctrl+C to stop current process
+          { command: "keyboard_press", params: { keys: ["control", "c"] } },
+          { command: "wait", params: { ms: wait }, waitBefore: 500 },
+          // Type 'claude' to restart
+          { command: "keyboard_type", params: { text: "claude" } },
+          { command: "keyboard_press", params: { keys: ["enter"] } },
+          // Wait for Claude Code to start
+          { command: "wait", params: { ms: Math.max(wait * 2, 5000) } },
+          // Type /mcp to reconnect
+          { command: "keyboard_type", params: { text: "/mcp" } },
+          { command: "keyboard_press", params: { keys: ["enter"] } },
+        ];
+      }
+
+      const timeoutMs = 10000 + actions.length * 5000 + (wait * 3);
+      const result = await sendCommand("batch_execute", { actions, stopOnError: false }, timeoutMs);
+      return {
+        content: [{
+          type: "text",
+          text: `MCP 재연결 수행 완료 (${params.terminalAction}). Claude Code가 정상 시작되었는지 확인해주세요.`,
+        }],
+      };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  // 12. SYSTEM INFO
   // ════════════════════════════════════════════════════════════════
 
   server.tool(

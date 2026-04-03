@@ -160,10 +160,20 @@ async function captureAndEncode(options = {}) {
   const jpegBuffer = await pipeline.jpeg({ quality }).toBuffer();
   const finalMeta = await sharp(jpegBuffer).metadata();
 
+  // Calculate scale factor so AI can map image coords → real screen coords
+  const screenWidth = region ? Number(region.width) : captured.width;
+  const screenHeight = region ? Number(region.height) : captured.height;
+  const scaleX = screenWidth / finalMeta.width;
+  const scaleY = screenHeight / finalMeta.height;
+
   return {
     image: jpegBuffer.toString("base64"),
     width: finalMeta.width,
     height: finalMeta.height,
+    screenWidth,
+    screenHeight,
+    scaleX,
+    scaleY,
     monitorOffset: { x: captured.offsetX, y: captured.offsetY },
   };
 }
