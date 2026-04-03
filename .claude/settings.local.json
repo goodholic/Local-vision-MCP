@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(timeout 5 node index.js)",
+      "Bash(node -e \"import\\('./handlers/router.js'\\).then\\(\\(\\) => console.log\\('OK'\\)\\).catch\\(e => console.error\\(e.message\\)\\)\")"
+    ]
+  }
+}

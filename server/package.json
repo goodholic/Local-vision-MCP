@@ -1,0 +1,17 @@
+{
+  "name": "local-vision-mcp-server",
+  "version": "1.0.0",
+  "description": "Railway MCP server with SSE transport + Socket.io relay to local PC",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0"
+  }
+}
