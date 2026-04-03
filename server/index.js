@@ -2,8 +2,7 @@ import express from "express";
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { z } from "zod";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { v4 as uuidv4 } from "uuid";
 import { registerTools } from "./tools/index.js";
 
@@ -79,13 +78,13 @@ export function sendCommand(command, params = {}, timeoutMs = 60000) {
 }
 
 // ─── OAuth discovery endpoints (return JSON 404 so MCP clients skip auth) ───
-app.get("/.well-known/oauth-authorization-server", (req, res) => {
+app.get("/.well-known/oauth-authorization-server", (_req, res) => {
   res.status(404).json({ error: "not_found" });
 });
-app.get("/.well-known/oauth-protected-resource/:path(*)?", (req, res) => {
+app.get("/.well-known/oauth-protected-resource", (_req, res) => {
   res.status(404).json({ error: "not_found" });
 });
-app.post("/register", (req, res) => {
+app.post("/register", (_req, res) => {
   res.status(404).json({ error: "not_found" });
 });
 
@@ -108,29 +107,46 @@ const mcpServer = new McpServer({
 // Register all tools
 registerTools(mcpServer, sendCommand);
 
-// ─── SSE Transport for MCP ───────────────────────────────────────
+// ─── Streamable HTTP Transport for MCP ───────────────────────────
 const transports = {};
 
-app.get("/sse", async (req, res) => {
-  const transport = new SSEServerTransport("/messages", res);
-  transports[transport.sessionId] = transport;
-  console.log(`[MCP] SSE session started: ${transport.sessionId}`);
+app.all("/mcp", async (req, res) => {
+  // For new sessions (initialization), create a new transport
+  const sessionId = req.headers["mcp-session-id"];
 
-  res.on("close", () => {
-    delete transports[transport.sessionId];
-    console.log(`[MCP] SSE session closed: ${transport.sessionId}`);
-  });
+  if (sessionId && transports[sessionId]) {
+    // Existing session — delegate to existing transport
+    await transports[sessionId].handleRequest(req, res);
+    return;
+  }
 
-  await mcpServer.connect(transport);
+  if (req.method === "GET" || (req.method === "POST" && !sessionId)) {
+    // New session or SSE listen
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => uuidv4(),
+    });
+    await mcpServer.connect(transport);
+
+    transports[transport.sessionId] = transport;
+    console.log(`[MCP] Session started: ${transport.sessionId}`);
+
+    transport.onclose = () => {
+      delete transports[transport.sessionId];
+      console.log(`[MCP] Session closed: ${transport.sessionId}`);
+    };
+
+    await transport.handleRequest(req, res);
+    return;
+  }
+
+  res.status(400).json({ error: "Bad request: no valid session" });
 });
 
-app.post("/messages", async (req, res) => {
-  const sessionId = req.query.sessionId;
-  const transport = transports[sessionId];
-  if (!transport) {
-    return res.status(404).json({ error: "Session not found" });
-  }
-  await transport.handlePostMessage(req, res);
+// Keep legacy /sse endpoint as redirect hint
+app.get("/sse", (_req, res) => {
+  res.status(200).json({
+    message: "SSE transport is deprecated. Use /mcp endpoint with Streamable HTTP transport.",
+  });
 });
 
 // ─── Start ───────────────────────────────────────────────────────

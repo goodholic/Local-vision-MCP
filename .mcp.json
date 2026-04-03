@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "local-vision": {
-      "type": "sse",
-      "url": "https://local-vision-mcp-production.up.railway.app/sse"
+      "type": "streamable-http",
+      "url": "https://local-vision-mcp-production.up.railway.app/mcp"
     }
   }
 }
