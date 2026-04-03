@@ -118,6 +118,7 @@ const transports = {};
 function createMcpTransport() {
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: () => uuidv4(),
+    enableJsonResponse: true,
   });
   mcpServer.connect(transport);
   transports[transport.sessionId] = transport;
