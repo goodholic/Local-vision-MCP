@@ -130,6 +130,15 @@ function createMcpTransport() {
   return transport;
 }
 
+// Ensure Accept header includes both types required by MCP SDK
+app.use("/mcp", (req, _res, next) => {
+  const accept = req.headers.accept || "";
+  if (!accept.includes("application/json") || !accept.includes("text/event-stream")) {
+    req.headers.accept = "application/json, text/event-stream";
+  }
+  next();
+});
+
 // POST /mcp — initialize new session or send requests to existing session
 app.post("/mcp", async (req, res) => {
   const sessionId = req.headers["mcp-session-id"];
