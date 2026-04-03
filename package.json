@@ -1,0 +1,16 @@
+{
+  "name": "local-vision-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "install:server": "cd server && npm install --production"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0"
+  }
+}
