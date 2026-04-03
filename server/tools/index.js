@@ -12,18 +12,19 @@ export function registerTools(server, sendCommand) {
 
   server.tool(
     "capture_screen",
-    "로컬 PC 화면 전체를 캡처합니다. 현재 화면 상태를 확인할 때 사용하세요.",
+    "로컬 PC 화면을 캡처합니다. 듀얼 모니터 지원: monitor=0(주), monitor=1(보조), monitor='all'(전체). 기본값은 주 모니터.",
     {
-      monitor: z.number().optional().describe("모니터 번호 (0부터 시작, 기본값: 0)"),
+      monitor: z.union([z.number(), z.string()]).optional().describe("모니터 선택: 0=주모니터, 1=보조모니터, 'all'=전체 (기본값: 주모니터)"),
       quality: z.number().min(1).max(100).optional().describe("JPEG 품질 (1-100, 기본값: 60)"),
       maxWidth: z.number().optional().describe("최대 가로 픽셀 (리사이즈, 기본값: 1920)"),
     },
     async (params) => {
       const result = await sendCommand("capture_screen", params);
+      const monitorLabel = params.monitor === "all" ? "전체" : params.monitor != null ? `모니터${params.monitor}` : "주모니터";
       return {
         content: [
           { type: "image", data: result.image, mimeType: "image/jpeg" },
-          { type: "text", text: `화면 캡처 완료 (${result.width}x${result.height})` },
+          { type: "text", text: `${monitorLabel} 캡처 완료 (${result.width}x${result.height})` },
         ],
       };
     }
@@ -38,6 +39,7 @@ export function registerTools(server, sendCommand) {
       width: z.number().describe("캡처 너비"),
       height: z.number().describe("캡처 높이"),
       quality: z.number().min(1).max(100).optional().describe("JPEG 품질 (기본값: 80)"),
+      monitor: z.union([z.number(), z.string()]).optional().describe("모니터 선택 (기본값: 주모니터)"),
     },
     async (params) => {
       const result = await sendCommand("capture_region", params);
