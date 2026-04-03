@@ -115,36 +115,50 @@ registerTools(mcpServer, sendCommand);
 // ─── Streamable HTTP Transport for MCP ───────────────────────────
 const transports = {};
 
-app.all("/mcp", async (req, res) => {
-  // For new sessions (initialization), create a new transport
-  const sessionId = req.headers["mcp-session-id"];
+function createMcpTransport() {
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => uuidv4(),
+  });
+  mcpServer.connect(transport);
+  transports[transport.sessionId] = transport;
+  console.log(`[MCP] Session started: ${transport.sessionId}`);
+  transport.onclose = () => {
+    delete transports[transport.sessionId];
+    console.log(`[MCP] Session closed: ${transport.sessionId}`);
+  };
+  return transport;
+}
 
+// POST /mcp — initialize new session or send requests to existing session
+app.post("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"];
   if (sessionId && transports[sessionId]) {
-    // Existing session — delegate to existing transport
     await transports[sessionId].handleRequest(req, res);
     return;
   }
+  // No session or unknown session — create new transport
+  const transport = createMcpTransport();
+  await transport.handleRequest(req, res);
+});
 
-  if (req.method === "GET" || (req.method === "POST" && !sessionId)) {
-    // New session or SSE listen
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => uuidv4(),
-    });
-    await mcpServer.connect(transport);
-
-    transports[transport.sessionId] = transport;
-    console.log(`[MCP] Session started: ${transport.sessionId}`);
-
-    transport.onclose = () => {
-      delete transports[transport.sessionId];
-      console.log(`[MCP] Session closed: ${transport.sessionId}`);
-    };
-
-    await transport.handleRequest(req, res);
+// GET /mcp — open SSE stream for existing session
+app.get("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"];
+  if (sessionId && transports[sessionId]) {
+    await transports[sessionId].handleRequest(req, res);
     return;
   }
+  res.status(400).json({ error: "Missing or invalid session. Send POST to initialize first." });
+});
 
-  res.status(400).json({ error: "Bad request: no valid session" });
+// DELETE /mcp — close session
+app.delete("/mcp", async (req, res) => {
+  const sessionId = req.headers["mcp-session-id"];
+  if (sessionId && transports[sessionId]) {
+    await transports[sessionId].handleRequest(req, res);
+    return;
+  }
+  res.status(404).json({ error: "Session not found" });
 });
 
 // Keep legacy /sse endpoint as redirect hint
